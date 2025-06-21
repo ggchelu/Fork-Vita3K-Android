@@ -154,6 +154,10 @@ if(USE_DYNARMIC)
 	set(DYNARMIC_TESTS OFF CACHE BOOL "")
 	set(DYNARMIC_NO_BUNDLED_FMT ON CACHE BOOL "")
 	set(DYNARMIC_FRONTENDS "A32" CACHE STRING "")
+	# Enable W^X support for Android to comply with SELinux execstack restrictions
+	if(ANDROID)
+		set(DYNARMIC_ENABLE_NO_EXECUTE_SUPPORT ON CACHE BOOL "")
+	endif()
 	add_subdirectory(dynarmic)
 
 	if(MSVC)
@@ -299,33 +303,22 @@ if(APPLE)
 	endif()
 endif()
 
-
-
-find_package(OpenSSL QUIET)
-if(NOT OPENSSL_FOUND)
-	if(MSVC)
-		message("OpenSSL not found, using prebuilt version")
-
-		if(NOT EXISTS "${CMAKE_BINARY_DIR}/external/openssl.zip")
-			message(STATUS "Downloading openssl...")
-			file(DOWNLOAD https://firedaemon.com/download-firedaemon-openssl-3.1-zip
-				"${CMAKE_BINARY_DIR}/external/openssl.zip" SHOW_PROGRESS)
-		endif()
-
-		if(NOT EXISTS "${CMAKE_BINARY_DIR}/external/openssl")
-			file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/external/openssl")
-			execute_process(COMMAND ${CMAKE_COMMAND} -E tar xf "${CMAKE_BINARY_DIR}/external/openssl.zip"
-				WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/external/openssl")
-		endif()
-
-		set(OPENSSL_ROOT_DIR "${CMAKE_BINARY_DIR}/external/openssl/openssl-3.1/x64")
-	endif()
-
-	find_package(OpenSSL REQUIRED)
+if(ANDROID)
+    message("Android build detected: Using vcpkg OpenSSL")
+    # For Android, find OpenSSL via vcpkg (should be automatically found via vcpkg toolchain)
+    find_package(OpenSSL REQUIRED)
+    message("Found OpenSSL via vcpkg: ${OPENSSL_INCLUDE_DIR}")
+    message("OpenSSL Crypto Library: ${OPENSSL_CRYPTO_LIBRARY}")
+    message("OpenSSL SSL Library: ${OPENSSL_SSL_LIBRARY}")
+else()
+    find_package(OpenSSL QUIET)
+    if(NOT OPENSSL_FOUND)
+        message("OpenSSL not found")
+    else()
+        message("OpenSSL include dir: ${OPENSSL_INCLUDE_DIR}")
+        message("OpenSSL libraries: ${OPENSSL_LIBRARIES}")
+    endif()
 endif()
-
-message("OpenSSL include dir: ${OPENSSL_INCLUDE_DIR}")
-message("OpenSSL libraries: ${OPENSSL_LIBRARIES}")
 
 add_library(ssl INTERFACE)
 target_link_libraries(ssl INTERFACE OpenSSL::SSL)

@@ -161,10 +161,20 @@ macro(get_boost)
 
 		  set(Boost_NO_WARN_NEW_VERSIONS 1)
 
-		  # First, try to find Boost without any hints (system Boost)
-		  if(NOT VITA3K_FORCE_CUSTOM_BOOST)
-		      find_package(Boost COMPONENTS ${BOOST_MODULES_TO_FIND} QUIET)
-		  endif()
+		  	  # For Android builds, use vcpkg boost directly 
+	  if(ANDROID)
+	      message(STATUS "Android build detected, using vcpkg Boost libraries")
+	      # Force vcpkg to provide the Boost targets
+	      find_package(Boost COMPONENTS ${BOOST_MODULES_TO_FIND} REQUIRED)
+	      if(Boost_FOUND)
+	          message(STATUS "Found vcpkg Boost libraries for Android")
+	      endif()
+	  else()
+	      # First, try to find Boost without any hints (system Boost)
+	      if(NOT VITA3K_FORCE_CUSTOM_BOOST)
+	          find_package(Boost COMPONENTS ${BOOST_MODULES_TO_FIND} QUIET)
+	      endif()
+	  endif()
 
 		  # If system Boost hasn't been found, then enable hints to find custom Boost
 		  if (NOT Boost_FOUND)
@@ -182,55 +192,59 @@ macro(get_boost)
 
 		      # If no build of the custom distribution is found, compile it
 		      if(NOT Boost_FOUND)
-		          message(STATUS "No existing custom distribution of Boost has been found in ${BOOST_INSTALLDIR}. Proceeding to compile Boost...")
+		          if(ANDROID)
+		              message(FATAL_ERROR "Android build should have found vcpkg Boost libraries, but did not. Check vcpkg configuration.")
+		          else()
+		              message(STATUS "No existing custom distribution of Boost has been found in ${BOOST_INSTALLDIR}. Proceeding to compile Boost...")
 
-		          # Set compilation toolset for b2 and Boost builds
-		          if (CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
-		              if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-		                  if(CMAKE_GENERATOR_TOOLSET STREQUAL "ClangCL")
-		                      # Proper toolset should be "clang-win", but b2 has a bug that makes it spam Visual Studio instances if set
-		                      # Since Clang for Windows is ABI-compatible with MSVC, using MSVC is fine
-		                      set(BOOST_TOOLSET "msvc")
+		              # Set compilation toolset for b2 and Boost builds
+		              if (CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
+		                  if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+		                      if(CMAKE_GENERATOR_TOOLSET STREQUAL "ClangCL")
+		                          # Proper toolset should be "clang-win", but b2 has a bug that makes it spam Visual Studio instances if set
+		                          # Since Clang for Windows is ABI-compatible with MSVC, using MSVC is fine
+		                          set(BOOST_TOOLSET "msvc")
+		                      else()
+		                          message(WARNING "Boost compilation on Windows requires the use of a clang-cl compiler running inside a Visual Studio Developer CLI environment with a Windows C++ SDK available.")
+		                          set(BOOST_TOOLSET "msvc")
+		                      endif()
 		                  else()
-		                      message(WARNING "Boost compilation on Windows requires the use of a clang-cl compiler running inside a Visual Studio Developer CLI environment with a Windows C++ SDK available.")
 		                      set(BOOST_TOOLSET "msvc")
 		                  endif()
+		              elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
+		                  if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+		                      set(BOOST_TOOLSET "clang")
+		                  elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+		                      set(BOOST_TOOLSET "gcc")
+		                  endif()
+		              endif()
+
+		              # Determine b2 executable name depending on host system
+		              if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
+		                  set(b2_EXECUTABLE_NAME "b2.exe")
 		              else()
-		                  set(BOOST_TOOLSET "msvc")
+		                  set(b2_EXECUTABLE_NAME "b2")
 		              endif()
-		          elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
-		              if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-		                  set(BOOST_TOOLSET "clang")
-		              elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-		                  set(BOOST_TOOLSET "gcc")
+
+		              # Find b2
+		              find_program(b2 NAME ${b2_EXECUTABLE_NAME} PATHS ${BOOST_SOURCEDIR} NO_CACHE NO_DEFAULT_PATH)
+
+		              # Compile b2 if it isn't found
+		              if(b2 STREQUAL "b2-NOTFOUND")
+		                  message(STATUS "The b2 buildsystem executable hasn't been found in your system. Compiling b2...")
+		                  b2_build()
+
+		                  # Find b2 again after compilation
+		                  find_program(b2 NAME ${b2_EXECUTABLE_NAME} PATHS ${BOOST_SOURCEDIR} NO_CACHE NO_DEFAULT_PATH REQUIRED)
 		              endif()
+
+		              # Compile Boost
+		              message(STATUS "Compiling Boost...")
+		              boost_compile()
+
+		              # Find Boost again
+		              find_package(Boost COMPONENTS ${BOOST_MODULES_TO_FIND} PATHS ${BOOST_INSTALLDIR} NO_DEFAULT_PATH REQUIRED)
 		          endif()
-
-		          # Determine b2 executable name depending on host system
-		          if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
-		              set(b2_EXECUTABLE_NAME "b2.exe")
-		          else()
-		              set(b2_EXECUTABLE_NAME "b2")
-		          endif()
-
-		          # Find b2
-		          find_program(b2 NAME ${b2_EXECUTABLE_NAME} PATHS ${BOOST_SOURCEDIR} NO_CACHE NO_DEFAULT_PATH)
-
-		          # Compile b2 if it isn't found
-		          if(b2 STREQUAL "b2-NOTFOUND")
-		              message(STATUS "The b2 buildsystem executable hasn't been found in your system. Compiling b2...")
-		              b2_build()
-
-		              # Find b2 again after compilation
-		              find_program(b2 NAME ${b2_EXECUTABLE_NAME} PATHS ${BOOST_SOURCEDIR} NO_CACHE NO_DEFAULT_PATH REQUIRED)
-		          endif()
-
-		          # Compile Boost
-		          message(STATUS "Compiling Boost...")
-		          boost_compile()
-
-		          # Find Boost again
-		          find_package(Boost COMPONENTS ${BOOST_MODULES_TO_FIND} PATHS ${BOOST_INSTALLDIR} NO_DEFAULT_PATH REQUIRED)
 		      else()
 		          message(STATUS "Custom Boost distribution found in ${BOOST_INSTALLDIR}")
 		      endif()

@@ -22,7 +22,7 @@ if (VCPKG_TARGET_ANDROID)
     #
     # 1. Check the presence of environment variable ANDROID_NDK_HOME
     #
-    if (NOT DEFINED ENV{ANDROID_NDK_HOME})
+    if (NOT DEFINED ENV{ANDROID_NDK_HOME} AND NOT DEFINED ANDROID_NDK_HOME)
         message(FATAL_ERROR "
         Please set an environment variable ANDROID_NDK_HOME
         For example:
@@ -32,15 +32,29 @@ if (VCPKG_TARGET_ANDROID)
         ")
     endif()
 
+    # Use CMake variable as fallback if environment variable is not set
+    if (DEFINED ANDROID_NDK_HOME)
+        set(ANDROID_NDK_PATH "${ANDROID_NDK_HOME}")
+    else()
+        set(ANDROID_NDK_PATH "$ENV{ANDROID_NDK_HOME}")
+    endif()
+
     #
     # 2. Check the presence of environment variable VCPKG_ROOT
     #
-    if (NOT DEFINED ENV{VCPKG_ROOT})
+    if (NOT DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED VCPKG_ROOT)
         message(FATAL_ERROR "
         Please set an environment variable VCPKG_ROOT
         For example:
         export VCPKG_ROOT=/path/to/vcpkg
         ")
+    endif()
+
+    # Use CMake variable as fallback if environment variable is not set
+    if (DEFINED VCPKG_ROOT)
+        set(VCPKG_ROOT_PATH "${VCPKG_ROOT}")
+    else()
+        set(VCPKG_ROOT_PATH "$ENV{VCPKG_ROOT}")
     endif()
 
 
@@ -91,8 +105,8 @@ if (VCPKG_TARGET_ANDROID)
     # When using vcpkg, the vcpkg toolchain shall be specified first. 
     # However, vcpkg provides a way to preload and additional toolchain, 
     # with the VCPKG_CHAINLOAD_TOOLCHAIN_FILE option.
-    set(VCPKG_CHAINLOAD_TOOLCHAIN_FILE "$ENV{ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake")
-    set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake")
+    set(VCPKG_CHAINLOAD_TOOLCHAIN_FILE "${ANDROID_NDK_PATH}/build/cmake/android.toolchain.cmake")
+    set(CMAKE_TOOLCHAIN_FILE "${VCPKG_ROOT_PATH}/scripts/buildsystems/vcpkg.cmake")
     message("vcpkg_android.cmake: CMAKE_TOOLCHAIN_FILE was set to ${CMAKE_TOOLCHAIN_FILE}")
     message("vcpkg_android.cmake: VCPKG_CHAINLOAD_TOOLCHAIN_FILE was set to ${VCPKG_CHAINLOAD_TOOLCHAIN_FILE}")
 
