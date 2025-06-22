@@ -25,6 +25,8 @@
 #ifdef ANDROID
 #include <SDL.h>
 #include <jni.h>
+#include <fstream>
+#include <ctime>
 #endif
 
 namespace gui {
@@ -235,8 +237,18 @@ void draw_initial_setup(GuiState &gui, EmuEnvState &emuenv) {
         ImGui::SetCursorPos(ImVec2((WINDOW_SIZE.x / 2.f) - (ImGui::CalcTextSize(completed_setup).x / 2.f), (WINDOW_SIZE.y / 2.f) - ImGui::GetFontSize()));
         ImGui::Text("%s", completed_setup);
         ImGui::SetCursorPos(BIG_BUTTON_POS);
-        if (ImGui::Button(common["ok"].c_str(), BIG_BUTTON_SIZE) || ImGui::IsKeyPressed(static_cast<ImGuiKey>(emuenv.cfg.keyboard_button_cross)))
+        if (ImGui::Button(common["ok"].c_str(), BIG_BUTTON_SIZE) || ImGui::IsKeyPressed(static_cast<ImGuiKey>(emuenv.cfg.keyboard_button_cross))) {
             emuenv.cfg.initial_setup = true;
+#ifdef ANDROID
+            // Create marker file to prevent dual setup on Android
+            const auto setup_marker = emuenv.pref_path / ".setup_completed";
+            std::ofstream marker_file(setup_marker.string());
+            if (marker_file.is_open()) {
+                marker_file << "Setup completed on " << std::time(nullptr) << std::endl;
+                marker_file.close();
+            }
+#endif
+        }
         break;
     default: break;
     }
@@ -254,7 +266,7 @@ void draw_initial_setup(GuiState &gui, EmuEnvState &emuenv) {
     ImGui::SetCursorPos(ImVec2(display_size.x - BUTTON_SIZE.x - (14.f * SCALE.x), display_size.y - BUTTON_SIZE.y - (14.f * SCALE.y)));
     if ((setup < FINISHED) && ImGui::Button(lang["next"].c_str(), BUTTON_SIZE) || ImGui::IsKeyPressed(static_cast<ImGuiKey>(emuenv.cfg.keyboard_button_cross))) {
 #ifdef ANDROID
-        // Request storage permission and switch to shared storage when leaving SELECT_PREF_PATH
+        // Request storage permission when leaving SELECT_PREF_PATH
         if (setup == SELECT_PREF_PATH) {
             JNIEnv *env = (JNIEnv*)SDL_AndroidGetJNIEnv();
             jobject activity = (jobject)SDL_AndroidGetActivity();
@@ -268,10 +280,6 @@ void draw_initial_setup(GuiState &gui, EmuEnvState &emuenv) {
             
             env->DeleteLocalRef(clazz);
             env->DeleteLocalRef(activity);
-            
-            // Switch to shared storage path after permission request
-            emuenv.pref_path = fs::path("/storage/emulated/0/Vita3K");
-            emuenv.cfg.set_pref_path(emuenv.pref_path);
         }
 #endif
         setup = (InitialSetup)(setup + 1);

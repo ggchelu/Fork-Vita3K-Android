@@ -55,6 +55,7 @@
 #include <adrenotools/driver.h>
 #include <boost/range/iterator_range.hpp>
 #include <jni.h>
+#include <android/log.h>
 
 static bool load_custom_driver(const std::string &driver_name) {
     fs::path driver_path = fs::path(SDL_AndroidGetInternalStoragePath()) / "driver" / driver_name / "/";

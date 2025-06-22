@@ -198,6 +198,9 @@ public class Emulator extends SDLActivity
         return (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) && Environment.isExternalStorageManager();
     }
 
+    private static final int MANAGE_EXTERNAL_STORAGE_REQUEST_CODE = 100;
+    private static final int LEGACY_STORAGE_REQUEST_CODE = 101;
+
     @Keep
     public void checkStoragePermission() {
         Log.d("Vita3K", "checkStoragePermission called");
@@ -209,7 +212,7 @@ public class Emulator extends SDLActivity
                 try {
                     Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
                     intent.setData(Uri.parse("package:" + getPackageName()));
-                    startActivity(intent);
+                    startActivityForResult(intent, MANAGE_EXTERNAL_STORAGE_REQUEST_CODE);
                 } catch (Exception e) {
                     Log.e("Vita3K", "Failed to open storage permission settings", e);
                     // Fallback to legacy permissions
@@ -232,7 +235,7 @@ public class Emulator extends SDLActivity
             ActivityCompat.requestPermissions(this, new String[]{
                 Manifest.permission.READ_EXTERNAL_STORAGE,
                 Manifest.permission.WRITE_EXTERNAL_STORAGE
-            }, 1);
+            }, LEGACY_STORAGE_REQUEST_CODE);
         } else {
             Log.d("Vita3K", "Legacy storage permissions already granted");
         }
@@ -251,26 +254,31 @@ public class Emulator extends SDLActivity
     public String getVita3KStoragePath() {
         Log.d("Vita3K", "getVita3KStoragePath called");
         
-        // If we have MANAGE_EXTERNAL_STORAGE permission, use public Vita3K directory
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Environment.isExternalStorageManager()) {
-            File publicDir = new File(Environment.getExternalStorageDirectory(), "Vita3K");
-            if (!publicDir.exists()) {
-                publicDir.mkdirs();
+        // Always try to use public Vita3K directory first
+        File publicDir = new File(Environment.getExternalStorageDirectory(), "Vita3K");
+        
+        // Check if we can access public storage
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (!Environment.isExternalStorageManager()) {
+                // Request permission but continue with public path
+                Log.d("Vita3K", "Requesting MANAGE_EXTERNAL_STORAGE permission");
+                checkStoragePermission();
             }
-            Log.d("Vita3K", "Using public storage: " + publicDir.getAbsolutePath());
-            return publicDir.getAbsolutePath();
+        } else {
+            // For older Android versions, request legacy permissions
+            if (!hasStoragePermission()) {
+                Log.d("Vita3K", "Requesting legacy storage permissions");
+                requestLegacyStoragePermissions();
+            }
         }
         
-        // Fallback to app-specific external storage
-        File appDir = getExternalFilesDir(null);
-        if (appDir != null) {
-            Log.d("Vita3K", "Using app-specific storage: " + appDir.getAbsolutePath());
-            return appDir.getAbsolutePath();
+        // Always create and use the public directory
+        if (!publicDir.exists()) {
+            publicDir.mkdirs();
         }
         
-        // Last resort - internal storage
-        Log.w("Vita3K", "Using internal storage as last resort");
-        return getFilesDir().getAbsolutePath();
+        Log.d("Vita3K", "Using public storage: " + publicDir.getAbsolutePath());
+        return publicDir.getAbsolutePath();
     }
 
     @Keep
@@ -314,10 +322,26 @@ public class Emulator extends SDLActivity
     }
 
     @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        
+        if (requestCode == LEGACY_STORAGE_REQUEST_CODE) {
+            boolean granted = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+            Log.d("Vita3K", "Legacy storage permissions result: " + granted);
+            // Permission result handled, app continues normally
+        }
+    }
+
+    @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
 
-        if(requestCode == FILE_DIALOG_CODE){
+        if (requestCode == MANAGE_EXTERNAL_STORAGE_REQUEST_CODE) {
+            Log.d("Vita3K", "Returned from MANAGE_EXTERNAL_STORAGE permission request");
+            boolean granted = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Environment.isExternalStorageManager();
+            Log.d("Vita3K", "MANAGE_EXTERNAL_STORAGE permission granted: " + granted);
+            // Permission result handled, app continues normally
+        } else if(requestCode == FILE_DIALOG_CODE){
             String result_path = "";
             int result_fd = -1;
             if(resultCode == RESULT_OK){
