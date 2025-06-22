@@ -1,26 +1,50 @@
 package org.vita3k.emulator;
 
 
+import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.AssetFileDescriptor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.PixelFormat;
+import android.graphics.Point;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
+import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Environment;
 import android.os.ParcelFileDescriptor;
 import android.provider.Settings;
 import android.system.ErrnoException;
 import android.system.Os;
+import android.util.DisplayMetrics;
+import android.util.Log;
+import android.view.Display;
+import android.view.InputDevice;
+import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.Surface;
+import android.view.SurfaceHolder;
+import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
+import android.view.WindowManager;
+import android.Manifest;
+import android.content.pm.PackageManager;
 
 import androidx.annotation.Keep;
 import androidx.core.content.pm.ShortcutInfoCompat;
 import androidx.core.content.pm.ShortcutManagerCompat;
 import androidx.core.graphics.drawable.IconCompat;
 import androidx.documentfile.provider.DocumentFile;
+import androidx.core.content.ContextCompat;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.FileProvider;
 
 import com.jakewharton.processphoenix.ProcessPhoenix;
 
@@ -42,6 +66,22 @@ public class Emulator extends SDLActivity
 
     public InputOverlay getmOverlay() {
         return mSurface.getmOverlay();
+    }
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        
+        // Obtain a reference to the main activity
+        mSingleton = this;
+
+        // Load shared libraries
+        String errorMsgBrokenLib = "";
+        try {
+            // Library loading is handled by SDL
+        } catch (Exception e) {
+            // Handle library loading errors if needed
+        }
     }
 
     @Keep
@@ -155,6 +195,71 @@ public class Emulator extends SDLActivity
 
     private boolean isStorageManagerEnabled(){
         return (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) && Environment.isExternalStorageManager();
+    }
+
+    @Keep
+    public void checkStoragePermission() {
+        Log.d("Vita3K", "checkStoragePermission called");
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // Android 11 and above - need MANAGE_EXTERNAL_STORAGE
+            if (!Environment.isExternalStorageManager()) {
+                Log.d("Vita3K", "Requesting MANAGE_EXTERNAL_STORAGE permission");
+                try {
+                    Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
+                    intent.setData(Uri.parse("package:" + getPackageName()));
+                    startActivity(intent);
+                } catch (Exception e) {
+                    Log.e("Vita3K", "Failed to open storage permission settings", e);
+                    // Fallback to legacy permissions
+                    requestLegacyStoragePermissions();
+                }
+            } else {
+                Log.d("Vita3K", "MANAGE_EXTERNAL_STORAGE permission already granted");
+            }
+        } else {
+            // Android 10 and below - use legacy permissions
+            requestLegacyStoragePermissions();
+        }
+    }
+    
+    private void requestLegacyStoragePermissions() {
+        Log.d("Vita3K", "Requesting legacy storage permissions");
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            
+            ActivityCompat.requestPermissions(this, new String[]{
+                Manifest.permission.READ_EXTERNAL_STORAGE,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE
+            }, 1);
+        } else {
+            Log.d("Vita3K", "Legacy storage permissions already granted");
+        }
+    }
+    
+    public boolean hasStoragePermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            return Environment.isExternalStorageManager();
+        } else {
+            return ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED &&
+                   ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
+        }
+    }
+
+    @Keep
+    public String getVita3KStoragePath() {
+        Log.d("Vita3K", "getVita3KStoragePath called");
+        
+        // Always use app-specific external storage for now - public storage requires explicit permission grant
+        File appDir = getExternalFilesDir(null);
+        if (appDir != null) {
+            Log.d("Vita3K", "Using app-specific storage: " + appDir.getAbsolutePath());
+            return appDir.getAbsolutePath();
+        }
+        
+        // Last resort - internal storage
+        Log.w("Vita3K", "Using internal storage as last resort");
+        return getFilesDir().getAbsolutePath();
     }
 
     @Keep

@@ -198,14 +198,27 @@ void update_viewport(EmuEnvState &state) {
 
 void init_paths(Root &root_paths) {
 #ifdef ANDROID
-    fs::path storage_path = fs::path(SDL_AndroidGetExternalStoragePath()) / "";
-    fs::path vita_storage_path = storage_path / "vita/";
+    // Get storage path from Java side where permissions are properly handled
+    JNIEnv* env = (JNIEnv*)SDL_AndroidGetJNIEnv();
+    jobject activity = (jobject)SDL_AndroidGetActivity();
+    jclass cls = env->GetObjectClass(activity);
+    jmethodID method = env->GetMethodID(cls, "getVita3KStoragePath", "()Ljava/lang/String;");
+    
+    jstring jpath = (jstring)env->CallObjectMethod(activity, method);
+    const char* cpath = env->GetStringUTFChars(jpath, nullptr);
+    fs::path storage_path = fs::path(cpath);
+    fs::path vita_storage_path = storage_path;
+    
+    env->ReleaseStringUTFChars(jpath, cpath);
+    env->DeleteLocalRef(jpath);
+    env->DeleteLocalRef(cls);
+    env->DeleteLocalRef(activity);
 
     root_paths.set_base_path(storage_path);
     // note: this one is not actually used, we must use custom functions to retrieve static assets
     root_paths.set_static_assets_path(storage_path);
 
-    root_paths.set_pref_path(vita_storage_path);
+    root_paths.set_pref_path(storage_path);
     root_paths.set_log_path(storage_path);
     root_paths.set_config_path(storage_path);
     root_paths.set_shared_path(storage_path);

@@ -22,6 +22,11 @@
 #include <host/dialog/filesystem.h>
 #include <lang/functions.h>
 
+#ifdef ANDROID
+#include <SDL.h>
+#include <jni.h>
+#endif
+
 namespace gui {
 
 enum InitialSetup {
@@ -151,7 +156,9 @@ void draw_initial_setup(GuiState &gui, EmuEnvState &emuenv) {
 #ifdef ANDROID
         ImGui::SetCursorPosX((WINDOW_SIZE.x / 2.f) - (ImGui::CalcTextSize(path_warning).x / 2.f));
         ImGui::TextColored(ImVec4(0.98f, 0.01f, 0.20f, 1.0f), "%s", path_warning);
-#endif
+        ImGui::SetCursorPosX((WINDOW_SIZE.x / 2.f) - (ImGui::CalcTextSize("/storage/emulated/0/Vita3K").x / 2.f));
+        ImGui::TextWrapped("/storage/emulated/0/Vita3K");
+#else
         ImGui::SetCursorPosX((WINDOW_SIZE.x / 2.f) - (ImGui::CalcTextSize(emuenv.cfg.pref_path.c_str()).x / 2.f));
         ImGui::TextWrapped("%s", emuenv.cfg.pref_path.c_str());
         ImGui::SetCursorPos(!is_default_path ? ImVec2((WINDOW_SIZE.x / 2.f) - BIG_BUTTON_SIZE.x - (20.f * SCALE.x), BIG_BUTTON_POS.y) : BIG_BUTTON_POS);
@@ -175,6 +182,7 @@ void draw_initial_setup(GuiState &gui, EmuEnvState &emuenv) {
                 }
             }
         }
+#endif
         break;
 
     case INSTALL_FIRMWARE:
@@ -244,8 +252,30 @@ void draw_initial_setup(GuiState &gui, EmuEnvState &emuenv) {
         setup = (InitialSetup)(setup - 1);
 
     ImGui::SetCursorPos(ImVec2(display_size.x - BUTTON_SIZE.x - (14.f * SCALE.x), display_size.y - BUTTON_SIZE.y - (14.f * SCALE.y)));
-    if ((setup < FINISHED) && ImGui::Button(lang["next"].c_str(), BUTTON_SIZE) || ImGui::IsKeyPressed(static_cast<ImGuiKey>(emuenv.cfg.keyboard_button_cross)))
+    if ((setup < FINISHED) && ImGui::Button(lang["next"].c_str(), BUTTON_SIZE) || ImGui::IsKeyPressed(static_cast<ImGuiKey>(emuenv.cfg.keyboard_button_cross))) {
+#ifdef ANDROID
+        // Request storage permission and switch to shared storage when leaving SELECT_PREF_PATH
+        if (setup == SELECT_PREF_PATH) {
+            JNIEnv *env = (JNIEnv*)SDL_AndroidGetJNIEnv();
+            jobject activity = (jobject)SDL_AndroidGetActivity();
+            
+            jclass clazz = env->GetObjectClass(activity);
+            jmethodID method = env->GetMethodID(clazz, "checkStoragePermission", "()V");
+            
+            if (method) {
+                env->CallVoidMethod(activity, method);
+            }
+            
+            env->DeleteLocalRef(clazz);
+            env->DeleteLocalRef(activity);
+            
+            // Switch to shared storage path after permission request
+            emuenv.pref_path = fs::path("/storage/emulated/0/Vita3K");
+            emuenv.cfg.set_pref_path(emuenv.pref_path);
+        }
+#endif
         setup = (InitialSetup)(setup + 1);
+    }
 
     ImGui::SetWindowFontScale(1.f);
 

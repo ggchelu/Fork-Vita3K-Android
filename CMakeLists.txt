@@ -161,15 +161,18 @@ macro(get_boost)
 
 		  set(Boost_NO_WARN_NEW_VERSIONS 1)
 
-		  	  # For Android builds, use vcpkg boost directly 
-	  if(ANDROID)
-	      message(STATUS "Android build detected, using vcpkg Boost libraries")
-	      # Force vcpkg to provide the Boost targets
-	      find_package(Boost COMPONENTS ${BOOST_MODULES_TO_FIND} REQUIRED)
-	      if(Boost_FOUND)
-	          message(STATUS "Found vcpkg Boost libraries for Android")
-	      endif()
-	  else()
+		  	  	  	  # For Android builds, use vcpkg boost directly 
+  if(ANDROID)
+      message(STATUS "Android build detected, using vcpkg Boost libraries")
+      # For Android, use individual boost component packages from vcpkg
+      find_package(boost_filesystem REQUIRED)
+      find_package(boost_system REQUIRED)
+      # The vcpkg packages already create the proper Boost::filesystem and Boost::system targets
+      # Set Boost_FOUND to true for compatibility
+      set(Boost_FOUND TRUE)
+      message(STATUS "Found vcpkg Boost libraries for Android")
+      message(STATUS "Boost include directories: ${_IMPORT_PREFIX}/include")
+  else()
 	      # First, try to find Boost without any hints (system Boost)
 	      if(NOT VITA3K_FORCE_CUSTOM_BOOST)
 	          find_package(Boost COMPONENTS ${BOOST_MODULES_TO_FIND} QUIET)
