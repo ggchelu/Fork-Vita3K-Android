@@ -64,12 +64,31 @@ void dump_data(const fs::path &path, const void *data, const std::streamsize siz
 
 std::vector<uint8_t> read_asset_raw(const fs::path &path) {
 #ifdef ANDROID
-    static const uint32_t base_path_size = strlen(SDL_AndroidGetExternalStoragePath()) + 1;
-    std::string file_path = path.string().substr(base_path_size);
-    SDL_RWops *file = SDL_RWFromFile(file_path.c_str(), "r");
+    // Try to open the file directly first, as the path might already be correct
+    SDL_RWops *file = SDL_RWFromFile(path.string().c_str(), "r");
     if (file == nullptr) {
-        LOG_ERROR("Could not open asset file {}", path.string());
-        return {};
+        // If direct access fails, try removing any base path prefix
+        std::string file_path = path.string();
+        
+        // Remove common Android storage prefixes if present
+        const std::vector<std::string> prefixes = {
+            "/storage/emulated/0/Vita3K/",
+            "/storage/emulated/0/Android/data/org.vita3k.emulator.debug/files/",
+            std::string(SDL_AndroidGetExternalStoragePath()) + "/"
+        };
+        
+        for (const auto& prefix : prefixes) {
+            if (file_path.find(prefix) == 0) {
+                file_path = file_path.substr(prefix.length());
+                break;
+            }
+        }
+        
+        file = SDL_RWFromFile(file_path.c_str(), "r");
+        if (file == nullptr) {
+            LOG_ERROR("Could not open asset file {}", path.string());
+            return {};
+        }
     }
 
     Sint64 size_read = SDL_RWsize(file);
@@ -77,6 +96,7 @@ std::vector<uint8_t> read_asset_raw(const fs::path &path) {
 
     if (SDL_RWread(file, raw_data.data(), size_read, 1) != 1) {
         LOG_ERROR("Could not read asset file {}", path.string());
+        SDL_RWclose(file);
         return {};
     }
 

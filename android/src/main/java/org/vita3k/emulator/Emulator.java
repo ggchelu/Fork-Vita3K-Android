@@ -143,8 +143,9 @@ public class Emulator extends SDLActivity
 
         // if we start the app from a shortcut and are in the main menu
         // or in a different game, start the new game
-        if(intent.getAction().startsWith("LAUNCH_")){
-            String game_id = intent.getAction().substring(7);
+        String action = intent.getAction();
+        if(action != null && action.startsWith("LAUNCH_")){
+            String game_id = action.substring(7);
             if(!game_id.equals(currentGameId))
                 ProcessPhoenix.triggerRebirth(getContext(), intent);
         }
@@ -250,7 +251,17 @@ public class Emulator extends SDLActivity
     public String getVita3KStoragePath() {
         Log.d("Vita3K", "getVita3KStoragePath called");
         
-        // Always use app-specific external storage for now - public storage requires explicit permission grant
+        // If we have MANAGE_EXTERNAL_STORAGE permission, use public Vita3K directory
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Environment.isExternalStorageManager()) {
+            File publicDir = new File(Environment.getExternalStorageDirectory(), "Vita3K");
+            if (!publicDir.exists()) {
+                publicDir.mkdirs();
+            }
+            Log.d("Vita3K", "Using public storage: " + publicDir.getAbsolutePath());
+            return publicDir.getAbsolutePath();
+        }
+        
+        // Fallback to app-specific external storage
         File appDir = getExternalFilesDir(null);
         if (appDir != null) {
             Log.d("Vita3K", "Using app-specific storage: " + appDir.getAbsolutePath());

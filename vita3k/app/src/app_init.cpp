@@ -204,15 +204,27 @@ void init_paths(Root &root_paths) {
     jclass cls = env->GetObjectClass(activity);
     jmethodID method = env->GetMethodID(cls, "getVita3KStoragePath", "()Ljava/lang/String;");
     
-    jstring jpath = (jstring)env->CallObjectMethod(activity, method);
-    const char* cpath = env->GetStringUTFChars(jpath, nullptr);
-    fs::path storage_path = fs::path(cpath);
-    fs::path vita_storage_path = storage_path;
+    fs::path storage_path;
     
-    env->ReleaseStringUTFChars(jpath, cpath);
-    env->DeleteLocalRef(jpath);
+    if (method != nullptr) {
+        jstring jpath = (jstring)env->CallObjectMethod(activity, method);
+        if (jpath != nullptr && !env->ExceptionCheck()) {
+            const char* cpath = env->GetStringUTFChars(jpath, nullptr);
+            storage_path = fs::path(cpath);
+            env->ReleaseStringUTFChars(jpath, cpath);
+            env->DeleteLocalRef(jpath);
+        } else {
+            // Clear any pending exception and fallback to SDL path
+            env->ExceptionClear();
+            storage_path = fs::path(SDL_AndroidGetExternalStoragePath()) / "vita" / "";
+        }
+    } else {
+        // Method not found, fallback to SDL path
+        env->ExceptionClear();
+        storage_path = fs::path(SDL_AndroidGetExternalStoragePath()) / "vita" / "";
+    }
+    
     env->DeleteLocalRef(cls);
-    env->DeleteLocalRef(activity);
 
     root_paths.set_base_path(storage_path);
     // note: this one is not actually used, we must use custom functions to retrieve static assets
