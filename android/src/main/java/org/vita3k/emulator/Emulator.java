@@ -251,28 +251,36 @@ public class Emulator extends SDLActivity
     }
 
     @Keep
+    public boolean hasRequiredStoragePermissions() {
+        Log.d("Vita3K", "hasRequiredStoragePermissions called");
+        boolean hasPermissions = hasStoragePermission();
+        Log.d("Vita3K", "Storage permissions available: " + hasPermissions);
+        return hasPermissions;
+    }
+
+    @Keep
     public String getVita3KStoragePath() {
         Log.d("Vita3K", "getVita3KStoragePath called");
         
         // Always try to use public Vita3K directory first
         File publicDir = new File(Environment.getExternalStorageDirectory(), "Vita3K");
         
-        // Check if we can access public storage
+        // Check if we need and have storage permissions
+        boolean needsPermission = false;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            if (!Environment.isExternalStorageManager()) {
-                // Request permission but continue with public path
-                Log.d("Vita3K", "Requesting MANAGE_EXTERNAL_STORAGE permission");
-                checkStoragePermission();
-            }
+            needsPermission = !Environment.isExternalStorageManager();
         } else {
-            // For older Android versions, request legacy permissions
-            if (!hasStoragePermission()) {
-                Log.d("Vita3K", "Requesting legacy storage permissions");
-                requestLegacyStoragePermissions();
-            }
+            needsPermission = !hasStoragePermission();
         }
         
-        // Always create and use the public directory
+        if (needsPermission) {
+            Log.d("Vita3K", "No storage permissions, returning path without directory creation");
+            // Don't create directories or request permissions here - just return the path
+            // The native code should handle this case gracefully
+            return publicDir.getAbsolutePath();
+        }
+        
+        // Only create directory if we have permissions
         if (!publicDir.exists()) {
             publicDir.mkdirs();
         }
@@ -328,7 +336,12 @@ public class Emulator extends SDLActivity
         if (requestCode == LEGACY_STORAGE_REQUEST_CODE) {
             boolean granted = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
             Log.d("Vita3K", "Legacy storage permissions result: " + granted);
-            // Permission result handled, app continues normally
+            
+            if (granted) {
+                // Restart the app to avoid graphics context corruption
+                Log.d("Vita3K", "Restarting app after legacy permission grant");
+                ProcessPhoenix.triggerRebirth(this);
+            }
         }
     }
 
@@ -340,7 +353,12 @@ public class Emulator extends SDLActivity
             Log.d("Vita3K", "Returned from MANAGE_EXTERNAL_STORAGE permission request");
             boolean granted = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Environment.isExternalStorageManager();
             Log.d("Vita3K", "MANAGE_EXTERNAL_STORAGE permission granted: " + granted);
-            // Permission result handled, app continues normally
+            
+            if (granted) {
+                // Restart the app to avoid graphics context corruption
+                Log.d("Vita3K", "Restarting app after permission grant");
+                ProcessPhoenix.triggerRebirth(this);
+            }
         } else if(requestCode == FILE_DIALOG_CODE){
             String result_path = "";
             int result_fd = -1;

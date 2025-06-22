@@ -203,6 +203,41 @@ void init_paths(Root &root_paths) {
     JNIEnv* env = (JNIEnv*)SDL_AndroidGetJNIEnv();
     jobject activity = (jobject)SDL_AndroidGetActivity();
     jclass cls = env->GetObjectClass(activity);
+    
+    // Check if we have required storage permissions first
+    jmethodID permission_method = env->GetMethodID(cls, "hasRequiredStoragePermissions", "()Z");
+    bool has_permissions = false;
+    
+    if (permission_method != nullptr) {
+        has_permissions = env->CallBooleanMethod(activity, permission_method);
+        if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+            has_permissions = false;
+        }
+    }
+    
+    if (!has_permissions) {
+        // If no permissions, request them and use fallback path
+        jmethodID check_method = env->GetMethodID(cls, "checkStoragePermission", "()V");
+        if (check_method != nullptr) {
+            env->CallVoidMethod(activity, check_method);
+            env->ExceptionClear(); // Clear any exceptions from permission request
+        }
+        
+        // Use fallback path for now
+        env->DeleteLocalRef(cls);
+        fs::path fallback_path = fs::path(SDL_AndroidGetExternalStoragePath()) / "vita" / "";
+        root_paths.set_base_path(fallback_path);
+        root_paths.set_static_assets_path(fallback_path);
+        root_paths.set_pref_path(fallback_path);
+        root_paths.set_log_path(fallback_path);
+        root_paths.set_config_path(fallback_path);
+        root_paths.set_shared_path(fallback_path);
+        root_paths.set_cache_path(fallback_path / "cache" / "");
+        return;
+    }
+    
+    // We have permissions, proceed with normal storage path
     jmethodID method = env->GetMethodID(cls, "getVita3KStoragePath", "()Ljava/lang/String;");
     
     fs::path storage_path;
