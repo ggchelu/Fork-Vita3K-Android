@@ -263,7 +263,7 @@ public class Emulator extends SDLActivity
         Log.d("Vita3K", "getVita3KStoragePath called");
         
         // Always try to use public Vita3K directory first
-        File publicDir = new File(Environment.getExternalStorageDirectory(), "Vita3K");
+        File publicDir = new File(Environment.getExternalStorageDirectory(), "Emulation/storage/Vita3K");
         
         // Check if we need and have storage permissions
         boolean needsPermission = false;

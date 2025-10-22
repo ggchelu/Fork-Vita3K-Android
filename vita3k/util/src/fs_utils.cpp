@@ -72,7 +72,7 @@ std::vector<uint8_t> read_asset_raw(const fs::path &path) {
         
         // Remove common Android storage prefixes if present
         const std::vector<std::string> prefixes = {
-            "/storage/emulated/0/Vita3K/",
+            "/storage/emulated/0/Emulation/storage/Vita3K/",
             "/storage/emulated/0/Android/data/org.vita3k.emulator.debug/files/",
             std::string(SDL_AndroidGetExternalStoragePath()) + "/"
         };

@@ -63,7 +63,7 @@ public class VitaDocumentsProvider extends DocumentsProvider {
 
     private File getStorageDir(){
         // Use shared storage directory
-        File storage_dir = new File("/storage/emulated/0/Vita3K");
+        File storage_dir = new File("/storage/emulated/0/Emulation/storage/Vita3K");
         if(!storage_dir.exists())
             storage_dir.mkdirs();
 

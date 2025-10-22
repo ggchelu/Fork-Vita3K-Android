@@ -158,8 +158,8 @@ void draw_initial_setup(GuiState &gui, EmuEnvState &emuenv) {
 #ifdef ANDROID
         ImGui::SetCursorPosX((WINDOW_SIZE.x / 2.f) - (ImGui::CalcTextSize(path_warning).x / 2.f));
         ImGui::TextColored(ImVec4(0.98f, 0.01f, 0.20f, 1.0f), "%s", path_warning);
-        ImGui::SetCursorPosX((WINDOW_SIZE.x / 2.f) - (ImGui::CalcTextSize("/storage/emulated/0/Vita3K").x / 2.f));
-        ImGui::TextWrapped("/storage/emulated/0/Vita3K");
+        ImGui::SetCursorPosX((WINDOW_SIZE.x / 2.f) - (ImGui::CalcTextSize("/storage/emulated/0/Emulation/storage/Vita3K").x / 2.f));
+        ImGui::TextWrapped("/storage/emulated/0/Emulation/storage/Vita3K");
 #else
         ImGui::SetCursorPosX((WINDOW_SIZE.x / 2.f) - (ImGui::CalcTextSize(emuenv.cfg.pref_path.c_str()).x / 2.f));
         ImGui::TextWrapped("%s", emuenv.cfg.pref_path.c_str());
